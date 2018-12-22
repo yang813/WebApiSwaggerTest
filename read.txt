@@ -1,0 +1,4 @@
+$ git clone -b Sample01 https://github.com/yang813/WebApiSwaggerTest.git    拉取远程分支到本地
+如果使用图形化工具clone 拉取的是master下的内容
+git安装成功后，要使用管理员运行；
+https://www.cnblogs.com/yilezhu/p/10014027.html
