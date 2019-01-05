@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Threading;
 using Dapper;
 
 namespace Sample05
@@ -11,10 +12,79 @@ namespace Sample05
         static void Main(string[] args)
         {
             //Console.WriteLine("Hello World!");
-            test_insert();
+            //test_insert();
+            test_csrediscore();
             Console.ReadKey();
         }
 
+
+        static void test_high_csrediscore()
+        {
+            //普通订阅
+            RedisHelper.Subscribe(
+              ("chan1", msg => Console.WriteLine(msg.Body)),
+              ("chan2", msg => Console.WriteLine(msg.Body)));
+
+            //模式订阅（通配符）
+            RedisHelper.PSubscribe(new[] { "test*", "*test001", "test*002" }, msg => {
+                Console.WriteLine($"PSUB   {msg.MessageId}:{msg.Body}    {msg.Pattern}: chan:{msg.Channel}");
+            });
+            //模式订阅已经解决的难题：
+            //1、分区的节点匹配规则，导致通配符最大可能匹配全部节点，所以全部节点都要订阅
+            //2、本组 "test*", "*test001", "test*002" 订阅全部节点时，需要解决同一条消息不可执行多次
+
+            //发布
+            RedisHelper.Publish("chan1", "123123123");
+            //无论是分区或普通模式，RedisHelper.Publish 都可以正常通信
+
+
+
+        }
+
+        /// <summary>
+        /// CSRedisCore基础测试
+        /// </summary>
+        static void test_csrediscore()
+        {
+            //普通模式
+            var csredis = new CSRedis.CSRedisClient("127.0.0.1:6379,password=123456,defaultDatabase=csRedisCoreTest,poolsize=50,ssl=false,writeBuffer=10240");
+            //初始化
+            RedisHelper.Initialization(csredis);
+
+            RedisHelper.Set("name", "yangjb");//设置值。默认永不过期
+            //RedisHelper.SetAsync("name", "祝雷");//异步操作
+            Console.WriteLine(RedisHelper.Get<String>("name"));
+
+            RedisHelper.Set("time", DateTime.Now, 1);
+            Console.WriteLine(RedisHelper.Get<DateTime>("time"));
+            Thread.Sleep(1100);
+            Console.WriteLine(RedisHelper.Get<DateTime>("time"));
+
+            // 列表
+            RedisHelper.RPush("list", "第一个元素");
+            RedisHelper.RPush("list", "第二个元素");
+            RedisHelper.LInsertBefore("list", "第二个元素", "我是新插入的第二个元素！");
+            Console.WriteLine($"list的长度为{RedisHelper.LLen("list")}");
+            //Console.WriteLine($"list的长度为{RedisHelper.LLenAsync("list")}");//异步
+            Console.WriteLine($"list的第二个元素为{RedisHelper.LIndex("list", 1)}");
+            //Console.WriteLine($"list的第二个元素为{RedisHelper.LIndexAsync("list",1)}");//异步
+            // 哈希
+            RedisHelper.HSet("person", "name", "zhulei");
+            RedisHelper.HSet("person", "sex", "男");
+            RedisHelper.HSet("person", "age", "28");
+            RedisHelper.HSet("person", "adress", "hefei");
+            Console.WriteLine($"person这个哈希中的age为{RedisHelper.HGet<int>("person", "age")}");
+            //Console.WriteLine($"person这个哈希中的age为{RedisHelper.HGetAsync<int>("person", "age")}");//异步
+
+
+            // 集合
+            RedisHelper.SAdd("students", "zhangsan", "lisi");
+            RedisHelper.SAdd("students", "wangwu");
+            RedisHelper.SAdd("students", "zhaoliu");
+            Console.WriteLine($"students这个集合的大小为{RedisHelper.SCard("students")}");
+            Console.WriteLine($"students这个集合是否包含wagnwu:{RedisHelper.SIsMember("students", "wangwu")}");
+
+        }
 
         /// <summary>
         /// 测试插入单条数据
